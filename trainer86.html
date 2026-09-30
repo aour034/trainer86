@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>محاكي 8086 Trainer</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#e9ecea;--fg:#1c2a22;--led:#ff3b1f;--off:#3b0f0b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1311;--fg:#dfe8e2}}
+:root[data-theme="dark"]{--bg:#0f1311;--fg:#dfe8e2}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Tahoma,Arial,sans-serif;display:flex;justify-content:center}
+.wrap{width:100%;max-width:440px;padding:10px}
+.case{background:#2a2d2c;border-radius:16px;padding:8px;direction:ltr}
+.pcb{background:radial-gradient(#1f6a3b,#175230);border-radius:10px;padding:10px;position:relative}
+.ttl{color:#eaf3ec;font:700 11px Arial;letter-spacing:.6px;margin:0 0 8px}
+.chips{display:flex;gap:6px;margin-bottom:8px;align-items:flex-end}
+.chip{background:#141414;border-radius:2px;height:16px;flex:1;box-shadow:0 0 0 1px #000,inset 0 -3px 0 #333}
+.chip.t{height:30px;flex:2}.chip.s{flex:.6}
+.lbl{color:#eaf3ec;font:10px Arial;text-align:center;margin:0 0 3px}
+.disp{display:flex;justify-content:center;gap:14px;background:#1a0705;border-radius:6px;padding:10px 8px;border:2px solid #0d0403}
+.grp{display:flex;gap:3px}
+svg.dg{width:30px;height:50px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+button{font:inherit;border:0;border-radius:7px;color:#fff;min-height:54px;padding:6px 2px;line-height:1.15;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 0 #0006}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 #0006}button:focus-visible{outline:3px solid #ffd54a}
+.c{background:#1f74e0;font-size:12px;font-weight:700}
+.h{background:#14181a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.h b{font-size:21px}.h small{font-size:10px;color:#a9bdb0}
+.msg{margin:12px 2px 0;font-size:15px;line-height:1.7;min-height:52px}
+.rp{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font:12px monospace;direction:ltr;margin:10px 2px}.rp div{background:rgba(127,127,127,.15);padding:4px 6px;border-radius:5px}.ex{background:#1f74e0;width:100%;margin-top:8px;font-size:14px}
+.note{font-size:12.5px;opacity:.75;line-height:1.7;margin:6px 2px 0}
+</style></head><body><div class="wrap">
+<noscript><p style="background:#b3261e;color:#fff;padding:12px;border-radius:8px;line-height:1.8">الجافاسكربت مطفي، فالأزرار ما تشتغل. افتح الملف من متصفح (Chrome أو Safari) وليس من معاينة الملفات أو من داخل تليگرام/واتساب.</p></noscript>
+<div class="case"><div class="pcb"><p class="ttl">8086/8088 MICROPROCESSOR TRAINER KIT &nbsp; M86-01</p>
+<div class="chips"><i class="chip t"></i><i class="chip t"></i><i class="chip"></i><i class="chip s"></i><i class="chip"></i></div>
+<div style="display:flex;justify-content:space-around"><p class="lbl">ADDRESS DISPLAY</p><p class="lbl">DATA DISPLAY</p></div>
+<div class="disp"><div class="grp" id="A"></div><div class="grp" id="D"></div></div>
+<div class="grid" id="g"></div></div></div>
+<p class="msg" id="m"></p><div class="rp" id="rp"></div><div id="exs"></div>
+<p class="note">محاكي مبني على مانوال التجربة 1: RESET وEB وEW وER وGO وST مع NEXT وPRV وB.S، وزر . (TTY) للإنهاء أو بدء التنفيذ بعد GO. النقطة العشرية بالعنوان تضوي بوضع الفحص. التنفيذ يدعم أغلب التعليمات الأساسية (MOV, ADD, SUB, CMP, AND, OR, XOR, INC, DEC, PUSH, POP, Jcc, JMP, LOOP, CALL, RET, HLT)، والذاكرة 64KB مسطحة بدون سيجمنت. MUL وDIV وINT وغيرها غير مدعومة. الأحرف على شاشة الـ7-segment تقريبية (X تظهر H). تسلسل الأزرار بجهازك قد يختلف شوي، راجع الـ manual.</p>
+</div>
+<script>
+const SG={a:[5,5,25,5],b:[27,7,27,23],c:[27,27,27,43],d:[5,45,25,45],e:[3,27,3,43],f:[3,7,3,23],g:[5,25,25,25]};
+const CH={"0":"abcdef","1":"bc","2":"abdeg","3":"abcdg","4":"bcfg","5":"acdfg","6":"acdefg","7":"abc","8":"abcdefg","9":"abcdfg",A:"abcefg",B:"cdefg",C:"adef",D:"bcdeg",E:"adefg",F:"aefg",R:"eg",H:"bcefg",P:"abefg",L:"def","-":"g"," ":""};
+function dg(c,dot){const on=CH[c]||"";let s='<svg class="dg" viewBox="0 0 32 50">';for(const k in SG){const[x1,y1,x2,y2]=SG[k];s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${on.includes(k)?"var(--led)":"var(--off)"}" stroke-width="5" stroke-linecap="round"/>`}return s+(dot?'<circle cx="29" cy="46" r="3" fill="var(--led)"/>':"")+"</svg>"}
+const A=document.getElementById("A"),D=document.getElementById("D"),m=document.getElementById("m");
+const MP={X:"H",S:"5",I:"1"};
+function txt(s,n,dot){s=s.toUpperCase().replace(/[XSI]/g,c=>MP[c]).padStart(n," ").slice(-n);return[...s].map((c,i)=>dg(c,dot&&i==n-1)).join("")}
+const rp=document.getElementById("rp");function rr(){rp.innerHTML=Object.keys(reg).map(n=>"<div>"+n+" "+reg[n].toString(16).toUpperCase().padStart(4,"0")+"</div>").join("")+'<div style="grid-column:span 4">CF='+(reg.FL&1)+" PF="+(reg.FL>>2&1)+" ZF="+(reg.FL>>6&1)+" SF="+(reg.FL>>7&1)+" OF="+(reg.FL>>11&1)+"</div>"}
+function show(a,d,msg){rr();A.innerHTML=txt(a,4,S.mode&&S.mode!=="idle");D.innerHTML=txt(d,4);if(msg!==undefined)m.textContent=msg}
+const mem={},reg={AX:0,BX:0,CX:0,DX:0,SP:0,BP:0,SI:0,DI:0,CS:0,DS:0,SS:0,ES:0,IP:0,FL:0},RN=Object.keys(reg);
+const H=(n,l)=>n.toString(16).toUpperCase().padStart(l,"0");
+
+const N8=["AL","CL","DL","BL","AH","CH","DH","BH"],N16=["AX","CX","DX","BX","SP","BP","SI","DI"];
+const rb=a=>mem[a&1048575]||0,wb=(a,v)=>{mem[a&1048575]=v&255},rw=a=>rb(a)|rb(a+1)<<8,ww=(a,v)=>{wb(a,v);wb(a+1,v>>8)};
+const g8=i=>i<4?reg[N16[i]]&255:reg[N16[i-4]]>>8&255,g16=i=>reg[N16[i]],s16=(i,v)=>{reg[N16[i]]=v&65535};
+const s8=(i,v)=>{v&=255;const n=N16[i&3];reg[n]=i<4?reg[n]&65280|v:reg[n]&255|v<<8};
+let F={c:0,z:0,s:0,o:0,p:0},ip,halted=false;
+const fl=()=>{reg.FL=F.c|F.p<<2|F.z<<6|F.s<<7|F.o<<11|2};
+function alu(op,a,b,w){const M=w?65535:255,T=w?32768:128;let r;
+ if(op==0){r=a+b;F.c=r>M?1:0;F.o=(~(a^b)&(a^r)&T)?1:0}
+ else if(op==5||op==7){r=a-b;F.c=r<0?1:0;F.o=((a^b)&(a^r)&T)?1:0}
+ else{r=op==1?a|b:op==4?a&b:a^b;F.c=0;F.o=0}
+ r&=M;F.z=r?0:1;F.s=r&T?1:0;let p=r&255,q=0;while(p){q^=p&1;p>>=1}F.p=q?0:1;fl();return r}
+const f8=()=>rb(ip++),f16=()=>{const v=rw(ip);ip+=2;return v},sx=v=>v<<24>>24;
+function mr(w){const b=f8(),mod=b>>6,rg=b>>3&7,rm=b&7;let ea=null;
+ if(mod<3){const B=[reg.BX+reg.SI,reg.BX+reg.DI,reg.BP+reg.SI,reg.BP+reg.DI,reg.SI,reg.DI,reg.BP,reg.BX];
+  if(mod==0&&rm==6)ea=f16();else{ea=B[rm];if(mod==1)ea+=sx(f8());else if(mod==2)ea+=f16()}ea&=65535}
+ return{rg,get(){return ea==null?(w?g16(rm):g8(rm)):(w?rw(ea):rb(ea))},set(v){ea==null?(w?s16(rm,v):s8(rm,v)):(w?ww(ea,v):wb(ea,v))}}}
+const push=v=>{reg.SP=reg.SP-2&65535;ww(reg.SP,v)},pop=()=>{const v=rw(reg.SP);reg.SP=reg.SP+2&65535;return v};
+function exec(){ip=reg.IP;const op=f8();
+ if(op<64&&(op&7)<6&&![2,3].includes(op>>3)){const k=op>>3,t=op&7,w=t&1;
+  if(t<4){const q=mr(w),rv=w?g16(q.rg):g8(q.rg);
+   if(t<2){const r=alu(k,q.get(),rv,w);if(k!=7)q.set(r)}else{const r=alu(k,rv,q.get(),w);if(k!=7)w?s16(q.rg,r):s8(q.rg,r)}}
+  else{const im=w?f16():f8(),r=alu(k,w?reg.AX:reg.AX&255,im,w);if(k!=7)w?s16(0,r):s8(0,r)}}
+ else if(op>=64&&op<72){const c=F.c,i=op&7;s16(i,alu(0,g16(i),1,1));F.c=c;fl()}
+ else if(op>=72&&op<80){const c=F.c,i=op&7;s16(i,alu(5,g16(i),1,1));F.c=c;fl()}
+ else if(op>>3==10)push(g16(op&7));else if(op>>3==11)s16(op&7,pop());
+ else if(op>>4==7){const d=sx(f8()),n=op&15,z=F.z,c=F.c,sg=F.s,o=F.o;
+  if([o,!o,c,!c,z,!z,c||z,!c&&!z,sg,!sg,F.p,!F.p,sg!=o,sg==o,z||sg!=o,!z&&sg==o][n])ip+=d}
+ else if(op==128||op==129||op==131){const w=op&1,q=mr(w),k=q.rg;if(k==2||k==3)throw op;
+  let im=op==129?f16():op==131?sx(f8())&65535:f8();const r=alu(k,q.get(),im,w);if(k!=7)q.set(r)}
+ else if(op>=136&&op<140){const w=op&1,q=mr(w);if(op<138)q.set(w?g16(q.rg):g8(q.rg));else w?s16(q.rg,q.get()):s8(q.rg,q.get())}
+ else if(op==144){}
+ else if(op>=176&&op<184)s8(op&7,f8());else if(op>=184&&op<192)s16(op&7,f16());
+ else if(op==198||op==199){const w=op&1,q=mr(w);q.set(w?f16():f8())}
+ else if(op==235)ip+=sx(f8());else if(op==233){const d=f16();ip+=d}
+ else if(op==226){reg.CX=reg.CX-1&65535;const d=sx(f8());if(reg.CX)ip+=d}
+ else if(op==232){const d=f16();push(ip&65535);ip+=d}else if(op==195)ip=pop();
+ else if(op==244||op==204)halted=true;else throw op;
+ reg.IP=ip&65535}
+function run(a,step){reg.IP=a&65535;halted=false;let n=0,msg;
+ try{do{exec();n++}while(!halted&&!step&&n<200000);
+  msg=halted?"انتهى التنفيذ (HLT) بعد "+n+" تعليمة. النتائج بالسجلات تحت، أو اضغط ER.":step?"خطوة واحدة. IP صار "+H(reg.IP,4)+". اضغط ST مرة ثانية للخطوة اللي بعدها.":"توقف بعد "+n+" تعليمة، يمكن loop لا نهائي."}
+ catch(e){msg="تعليمة غير مدعومة (opcode "+(typeof e=="number"?H(e,2):"؟")+") عند "+H(reg.IP,4)+"."}
+ S.st=!!step;show(H(reg.IP,4),"  "+H(rb(reg.IP),2),msg)}
+const EX=[["مثال 1: MOV AX,AABB",1024,[184,187,170,244]],["مثال 2: MOV AL,45h",1536,[176,69,244]],["مثال 3: MOV AH,6Ch",1280,[180,108,244]],["تمرين: DFA1 في AX",1024,[184,161,223,244]],["تمرين: 869B في AX",1024,[184,155,134,244]],["تمرين: 7B في AL",1536,[176,123,244]],["تمرين: 8F في AH",1280,[180,143,244]]];
+EX.forEach(([t,a,b])=>{const e=document.createElement("button");e.className="ex";e.textContent="تحميل "+t+" ("+H(a,4)+")";e.onclick=()=>{b.forEach((v,i)=>mem[a+i]=v);S.mode="idle";show(H(a,4),"  "+H(v0(a),2),"تم تحميل البرنامج ("+b.map(x=>H(x,2)).join(" ")+") بالعنوان "+H(a,4)+". اضغط GO، اكتب "+H(a,4)+"، NEXT، ثم . (TTY). بعدها ER وشوف السجل.")};document.getElementById("exs").append(e)});
+const v0=a=>mem[a]||0;
+const DN={AX:"A",BX:"B",CX:"C",DX:"D",SP:"SP",BP:"bp",SI:"SI",DI:"dI",CS:"CS",DS:"dS",SS:"SS",ES:"ES",IP:"IP",FL:"FL"};
+let S={mode:"idle",w:false,buf:"",addr:0,ri:0};
+const val=()=>S.w?(mem[S.addr]||0)|((mem[S.addr+1]||0)<<8):(mem[S.addr]||0);
+const RMSG="اضغط رقم السجل: 0=AX 1=BX 2=CX 3=DX 4=SP 5=BP 6=SI 7=DI 8=CS 9=DS A=SS B=ES C=IP D=FL";
+function memShow(msg){const v=val();show(H(S.addr,4),S.w?H(v,4):"  "+H(v,2),msg||(S.w?"EW: اكتب قيمة 16 بت ثم NEXT للحفظ والانتقال (+2).":"EB: اكتب قيمة بايت ثم NEXT للحفظ والانتقال."))}
+function regShow(){const n=RN[S.ri];show(DN[n],H(reg[n],4),"السجل "+n+": اكتب قيمة ثم NEXT للحفظ والانتقال للسجل التالي.")}
+function start(w,act){S={...S,mode:"addr",w,buf:"",act:act||null};show("0000","",(act||(w?"EW":"EB")).toUpperCase()+": اكتب العنوان بالـ hex ثم اضغط NEXT.")}
+function redraw(){
+ if(S.mode==="addr"||S.mode==="go")show(S.buf.padStart(4,"0"),S.mode==="go"?"  "+H(rb(S.addr),2):"");
+ else if(S.mode==="data"){const n=S.w?4:2,t=S.buf===""?H(val(),n):S.buf.padStart(n,"0");show(H(S.addr,4),S.w?t:"  "+t)}
+ else if(S.mode==="regval"){show(DN[RN[S.ri]],S.buf===""?H(reg[RN[S.ri]],4):S.buf.padStart(4,"0"))}}
+function cmd(k){
+ if(k==="rst"){S={mode:"idle",w:false,buf:"",addr:0,ri:0};show("-SCB","  86","تم RESET (رسالة الـ sign-on). اضغط EB (مفتاح 0) أو ER (مفتاح 1) أو GO.");return}
+ if(k==="dot"){if(S.mode==="go"){S.mode="idle";run(S.addr,false);return}S.mode="idle";S.buf="";S.act=null;show("-   ","","رجع الـ prompt (–).");return}
+ if(k==="reg"){S.mode="regsel";show("    ","",RMSG);return}
+ if(k==="nxt"){
+  if(S.mode==="addr"){S.addr=parseInt(S.buf||"0",16);S.buf="";if(S.act){const a=S.act;S.act=null;S.mode="idle";run(S.addr,a==="st")}else{S.mode="data";memShow()}}
+  else if(S.mode==="go"){if(S.buf!=="")S.addr=parseInt(S.buf,16);S.buf="";reg.IP=S.addr&65535;show(H(S.addr,4),"  "+H(rb(S.addr),2),"تم تحديد العنوان. اضغط . (مفتاح TTY) لبدء التنفيذ.")}
+  else if(S.mode==="data"){if(S.buf!==""){const v=parseInt(S.buf,16);mem[S.addr]=v&255;if(S.w)mem[S.addr+1]=(v>>8)&255}S.addr=(S.addr+(S.w?2:1))&65535;S.buf="";memShow("تم الحفظ. العنوان التالي.")}
+  else if(S.mode==="regval"){if(S.buf!=="")reg[RN[S.ri]]=parseInt(S.buf,16);S.ri=(S.ri+1)%RN.length;S.buf="";regShow()}
+  return}
+ if(k==="prv"){
+  if(S.mode==="data"){S.addr=(S.addr-(S.w?2:1))&65535;S.buf="";memShow()}
+  else if(S.mode==="regval"){S.ri=(S.ri+RN.length-1)%RN.length;S.buf="";regShow()}
+  return}
+ if(k==="bs"){S.buf=S.buf.slice(0,-1);redraw();return}
+ m.textContent="هذا الأمر غير مُنفَّذ بالمحاكي."}
+function key(n,c){
+ if(S.mode==="idle"){
+  if(c==="EB")start(false);else if(c==="EW")start(true);else if(c==="GO"){S={...S,mode:"go",buf:"",addr:reg.IP,w:false};show(H(reg.IP,4),"  "+H(rb(reg.IP),2),"GO: IP الحالي ظاهر. اكتب عنوان جديد ثم NEXT، بعدها اضغط . (TTY) للتنفيذ.")}else if(c==="ST"){S.st?run(reg.IP,true):start(false,"st")}else if(c==="ER"){S.mode="regsel";show("    ","",RMSG)}
+  else m.textContent=(c?c+": ":"")+"هذا الأمر غير مُنفَّذ بالمحاكي.";return}
+ if(S.mode==="regsel"){if(n<RN.length){S.ri=n;S.mode="regval";S.buf="";regShow()}return}
+ const max=S.mode==="addr"||S.mode==="go"?5:S.mode==="regval"||S.w?4:2;
+ S.buf=(S.buf+H(n,1)).slice(-max);redraw()}
+const cm=[["FILL","PRV","prv"],["REG","","reg"],["INS","+","x"],["RESET","","rst"],["CRT","NEXT","nxt"],["B.S",":","bs"],["DEL","-","x"],["VCT","INTR","x"],["TTY",".","dot"],["F1","","x"],["F2","","x"],["F3","","x"]];
+const RG=["AX","BX","CX","DX","SP","BP","SI","DI","CS","DS","SS","ES","IP","FL"];
+const hx=[[0,"EB"],[4,"IB"],[8,"IW"],[12,"BC"],[1,"ER"],[5,"OB"],[9,"OW"],[13,"LS"],[2,"GO"],[6,"MV"],[10,""],[14,"VR"],[3,"ST"],[7,"EW"],[11,""],[15,"PRG"]];
+const g=document.getElementById("g");
+cm.forEach(([a,b,k])=>{const e=document.createElement("button");e.className="c";e.innerHTML=a+(b?"<br>"+b:"");e.onclick=()=>cmd(k);g.append(e)});
+hx.forEach(([n,c])=>{const e=document.createElement("button");e.className="h";e.innerHTML="<b>"+H(n,1)+"</b><small>"+(c||"")+"/"+(RG[n]||"")+"</small>";e.onclick=()=>key(n,c);g.append(e)});
+reg.SP=65280;show("-SCB","  86","اضغط EB (مفتاح 0) لفحص الذاكرة، أو ER (مفتاح 1) لفحص السجلات.");
+</script></body></html>
